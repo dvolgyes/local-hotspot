@@ -7,13 +7,65 @@
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 #-----------------------------------------------------------------------------
-# Configuration Variables
+# Argument Parsing (extract -c/--config before command)
 #-----------------------------------------------------------------------------
-HOTSPOT_CON_NAME="home-hotspot"
-HOTSPOT_SSID="home-hotspot"
-HOTSPOT_PASSWORD="dejonekem123"  # Minimum 8 characters required
-WIFI_INTERFACE=""   # Auto-detect if empty
-WIRED_INTERFACE=""  # Auto-detect if empty
+
+CUSTOM_CONFIG_FILE=""
+COMMAND_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -c|--config)
+            CUSTOM_CONFIG_FILE="$2"
+            shift 2
+            ;;
+        *)
+            COMMAND_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Restore positional parameters for command handling
+set -- "${COMMAND_ARGS[@]}"
+
+#-----------------------------------------------------------------------------
+# Configuration Loading (Priority: custom config > .env file > environment vars > defaults)
+#-----------------------------------------------------------------------------
+
+# Get script directory to find .env file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/.env"
+
+# Load custom config file if specified (highest priority)
+if [ -n "$CUSTOM_CONFIG_FILE" ]; then
+    if [ -f "$CUSTOM_CONFIG_FILE" ]; then
+        echo "Loading configuration from: $CUSTOM_CONFIG_FILE"
+        # Export variables from custom config file (skip comments and empty lines)
+        set -a
+        # shellcheck disable=SC1090
+        source <(grep -v '^#' "$CUSTOM_CONFIG_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//')
+        set +a
+    else
+        echo "ERROR: Config file not found: $CUSTOM_CONFIG_FILE" >&2
+        exit 1
+    fi
+# Otherwise, load .env file if it exists
+elif [ -f "$ENV_FILE" ]; then
+    echo "Loading configuration from: $ENV_FILE"
+    # Export variables from .env file (skip comments and empty lines)
+    set -a
+    # shellcheck disable=SC1090
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//')
+    set +a
+fi
+
+# Configuration Variables (with priority: .env > environment > defaults)
+HOTSPOT_CON_NAME="${HOTSPOT_CON_NAME:-home-hotspot}"
+HOTSPOT_SSID="${HOTSPOT_SSID:-home-hotspot}"
+HOTSPOT_PASSWORD="${HOTSPOT_PASSWORD:-examplecomplicatedpassword}"  # Minimum 8 characters required
+WIFI_INTERFACE="${WIFI_INTERFACE:-}"   # Auto-detect if empty
+WIRED_INTERFACE="${WIRED_INTERFACE:-}"  # Auto-detect if empty
 
 #-----------------------------------------------------------------------------
 # Interface Auto-Detection Functions
@@ -260,7 +312,7 @@ show_status() {
 
 print_usage() {
     cat << EOF
-Usage: $0 [COMMAND]
+Usage: $0 [-c|--config FILE] [COMMAND]
 
 Commands:
     start       Create and start the hotspot (default)
@@ -269,12 +321,21 @@ Commands:
     status      Show hotspot status
     help        Show this help message
 
-Configuration (edit at top of script):
+Options:
+    -c, --config FILE    Use custom config file instead of .env
+
+Configuration (priority: -c config > .env file > environment vars > defaults):
     HOTSPOT_CON_NAME    Connection name (default: $HOTSPOT_CON_NAME)
     HOTSPOT_SSID        WiFi SSID (default: $HOTSPOT_SSID)
     HOTSPOT_PASSWORD    WiFi password (default: [hidden])
     WIFI_INTERFACE      WiFi interface (auto-detect if empty)
     WIRED_INTERFACE     Ethernet interface (auto-detect if empty)
+
+Configuration methods:
+    1. Use custom config file: -c/--config option
+    2. Create a .env file (copy from .env.example)
+    3. Export environment variables before running
+    4. Edit defaults at top of script
 
 Examples:
     $0              # Start hotspot (default action)
@@ -283,7 +344,16 @@ Examples:
     $0 stop         # Stop hotspot
     $0 delete       # Delete hotspot connection
 
-Note: Requires sudo/root privileges for most operations
+    # Using custom config file
+    $0 -c hotspot.env start
+    $0 --config /path/to/config.env start
+
+    # Using environment variables
+    HOTSPOT_SSID=MyNetwork HOTSPOT_PASSWORD=MyPass123 $0 start
+
+Note: Usually works without sudo on modern systems. If you get permission errors,
+      your user may need to be added to the 'netdev' group or similar, or prefix
+      individual commands with sudo (sudo will remember credentials for ~15 min).
 EOF
 }
 
