@@ -41,10 +41,10 @@ ENV_FILE="${SCRIPT_DIR}/.env"
 if [ -n "$CUSTOM_CONFIG_FILE" ]; then
     if [ -f "$CUSTOM_CONFIG_FILE" ]; then
         echo "Loading configuration from: $CUSTOM_CONFIG_FILE"
-        # Export variables from custom config file (skip comments and empty lines)
+        # Export variables from custom config file (skip comments and empty lines, trim whitespace)
         set -a
         # shellcheck disable=SC1090
-        source <(grep -v '^#' "$CUSTOM_CONFIG_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//')
+        source <(grep -v '^#' "$CUSTOM_CONFIG_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         set +a
     else
         echo "ERROR: Config file not found: $CUSTOM_CONFIG_FILE" >&2
@@ -53,10 +53,10 @@ if [ -n "$CUSTOM_CONFIG_FILE" ]; then
 # Otherwise, load .env file if it exists
 elif [ -f "$ENV_FILE" ]; then
     echo "Loading configuration from: $ENV_FILE"
-    # Export variables from .env file (skip comments and empty lines)
+    # Export variables from .env file (skip comments and empty lines, trim whitespace)
     set -a
     # shellcheck disable=SC1090
-    source <(grep -v '^#' "$ENV_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//')
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^[[:space:]]*$' | sed 's/\r$//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     set +a
 fi
 
@@ -66,6 +66,13 @@ HOTSPOT_SSID="${HOTSPOT_SSID:-home-hotspot}"
 HOTSPOT_PASSWORD="${HOTSPOT_PASSWORD:-examplecomplicatedpassword}"  # Minimum 8 characters required
 WIFI_INTERFACE="${WIFI_INTERFACE:-}"   # Auto-detect if empty
 WIRED_INTERFACE="${WIRED_INTERFACE:-}"  # Auto-detect if empty
+
+# Trim whitespace from all configuration values (defensive programming)
+HOTSPOT_CON_NAME=$(echo "$HOTSPOT_CON_NAME" | xargs)
+HOTSPOT_SSID=$(echo "$HOTSPOT_SSID" | xargs)
+HOTSPOT_PASSWORD=$(echo "$HOTSPOT_PASSWORD" | xargs)
+WIFI_INTERFACE=$(echo "$WIFI_INTERFACE" | xargs)
+WIRED_INTERFACE=$(echo "$WIRED_INTERFACE" | xargs)
 
 #-----------------------------------------------------------------------------
 # Interface Auto-Detection Functions

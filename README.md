@@ -37,6 +37,34 @@ A robust bash script to create and manage a WiFi hotspot on Ubuntu 24.04 (and si
 
 5. **Connect your devices** to the WiFi network and enjoy internet access!
 
+### Automated Hotspot with NetworkManager Dispatcher
+
+For automatic hotspot management, NetworkManager can detect when your ethernet cable is connected or disconnected and automatically start or stop the hotspot. The dispatcher integration allows the hotspot to activate when you plug in ethernet and deactivate when you unplug it, making the process seamless.
+
+**Installation:**
+```bash
+./install.sh
+```
+
+The installer will:
+- Ask for your hotspot configuration (connection name, SSID, password)
+- Ask whether to enable automatic hotspot mode
+- Install the hotspot script to `/usr/local/bin/`
+- Install the NetworkManager dispatcher for automation
+- Set up everything with your chosen settings
+
+**Uninstallation:**
+```bash
+./uninstall.sh
+```
+
+The uninstaller will:
+- Show what will be removed
+- Ask for confirmation
+- Remove the hotspot connection from NetworkManager
+- Remove all installed files and dispatcher scripts
+- Restore normal WiFi behavior
+
 ## Configuration
 
 Configuration is loaded in this priority order:
@@ -67,8 +95,8 @@ cp .env.example hotspot.env
 nano hotspot.env
 
 # Use it with -c or --config option
-sudo ./create_hotspot.sh -c hotspot.env start
-sudo ./create_hotspot.sh --config /path/to/config.env start
+./create_hotspot.sh -c hotspot.env start
+./create_hotspot.sh --config /path/to/config.env start
 ```
 
 Example `hotspot.env`:
@@ -93,7 +121,7 @@ cp .env.example .env
 nano .env
 
 # Run without -c option to use .env automatically
-sudo ./create_hotspot.sh start
+./create_hotspot.sh start
 ```
 
 Example `.env`:
@@ -102,7 +130,7 @@ HOTSPOT_SSID=MyHomeNetwork
 HOTSPOT_PASSWORD=examplecomplicatedpassword
 ```
 
-#### Method 4: Using Environment Variables
+#### Method 3: Using Environment Variables
 
 ```bash
 export HOTSPOT_SSID="MyNetwork"
@@ -115,7 +143,7 @@ Or inline:
 HOTSPOT_SSID=MyNetwork HOTSPOT_PASSWORD=examplecomplicatedpassword ./create_hotspot.sh start
 ```
 
-#### Method 5: Edit Script Defaults
+#### Method 4: Edit Script Defaults
 
 Edit lines 62-64 in `create_hotspot.sh` to change the fallback defaults.
 
@@ -207,47 +235,9 @@ Provide internet access to visitors without sharing your main WiFi password.
 ./create_hotspot.sh stop
 ```
 
-### 5. **IoT Device Setup**
-Some IoT devices only support WiFi. Use this to provide internet during initial setup.
-
-```bash
-# Start hotspot
-./create_hotspot.sh start
-
-# Configure your smart device to connect
-# Device gets internet via your ethernet connection
-
-# After setup, stop if not needed
-./create_hotspot.sh stop
-```
-
-### 6. **Portable Router Replacement**
-Use your laptop as a WiFi access point when traveling or in remote locations.
-
-```bash
-# Connect laptop to ethernet
-# Start hotspot
-./create_hotspot.sh start
-
-# Multiple devices can now connect through your laptop
-```
-
-### 7. **Before Disconnecting Ethernet**
-If you know you'll be disconnecting from ethernet (e.g., moving to another room), stop the hotspot first:
-
-```bash
-# Before unplugging ethernet cable
-./create_hotspot.sh stop
-
-# Unplug and move...
-
-# After reconnecting ethernet elsewhere
-./create_hotspot.sh start
-```
-
 ## Requirements
 
-- **Ubuntu 24.04** (or similar Linux distribution)
+- **Ubuntu 24.04** (or similar Linux distribution, tested on this Ubuntu version)
 - **NetworkManager** - Usually pre-installed on Ubuntu Desktop
 - **dnsmasq** - Required for DHCP server
   ```bash
@@ -271,7 +261,6 @@ On modern Ubuntu systems (24.04 and recent versions), **sudo is usually NOT requ
    ```bash
    sudo ./create_hotspot.sh start
    ```
-   (sudo remembers credentials for ~15 minutes by default)
 
 ## Troubleshooting
 
@@ -341,68 +330,6 @@ WIFI_INTERFACE=wlp4s0
 WIRED_INTERFACE=enp3s0
 ```
 
-### Multiple Hotspot Configurations
-
-#### Option 1: Using -c flag (Recommended - Simpler)
-
-```bash
-# Create different config files
-cp .env.example hotspot-home.env
-cp .env.example hotspot-travel.env
-cp .env.example hotspot-guest.env
-
-# Edit each with different settings
-nano hotspot-home.env    # SSID=HomeNetwork, CON_NAME=home-hotspot
-nano hotspot-travel.env  # SSID=TravelNetwork, CON_NAME=travel-hotspot
-nano hotspot-guest.env   # SSID=GuestNetwork, CON_NAME=guest-hotspot
-
-# Use home config
-./create_hotspot.sh -c hotspot-home.env start
-
-# Switch to travel config (different connection name, so no need to delete)
-./create_hotspot.sh -c hotspot-travel.env start
-
-# Or use guest config
-./create_hotspot.sh -c hotspot-guest.env start
-
-# Check status of specific config
-./create_hotspot.sh -c hotspot-home.env status
-
-# Stop specific config
-./create_hotspot.sh -c hotspot-travel.env stop
-```
-
-#### Option 2: Using .env symlinks (Alternative)
-
-```bash
-# Create configs
-cp .env.example .env.home
-cp .env.example .env.travel
-
-# Edit each with different settings
-nano .env.home    # SSID=HomeNetwork
-nano .env.travel  # SSID=TravelNetwork
-
-# Use home config
-ln -sf .env.home .env
-./create_hotspot.sh start
-
-# Switch to travel config
-ln -sf .env.travel .env
-./create_hotspot.sh delete  # Remove old
-./create_hotspot.sh start   # Create new
-```
-
-### Running on Boot
-
-Add to crontab to start hotspot on boot:
-
-```bash
-sudo crontab -e
-
-# Add this line:
-@reboot sleep 30 && /path/to/create_hotspot.sh start
-```
 
 ## Security Considerations
 
@@ -416,11 +343,16 @@ sudo crontab -e
 
 ## Files
 
-- `create_hotspot.sh` - Main script
+- `create_hotspot.sh` - Main hotspot management script
+- `install.sh` - Automated installer for system-wide deployment
+- `uninstall.sh` - Uninstaller to remove all components
+- `70-wifi-wired-exclusive.sh` - NetworkManager dispatcher script for automation
 - `.env` - Your default configuration (create from `.env.example`)
 - `.env.example` - Example configuration template
 - `hotspot.env` - Sample custom config for testing `-c` option
+- `dispatcher-hotspot.env` - Sample dispatcher configuration
 - `README.md` - This file
+- `DISPATCHER_INSTALL.md` - Manual dispatcher installation guide
 
 ## License
 
